@@ -559,9 +559,16 @@
 
             // Robust API Call with Retry
             const callGeminiAPI = async (prompt) => {
-                if (!apiKey) throw new Error("未設定 API 金鑰");
+                // 如果是下載後執行，請確保這裡填入有效的 API Key
+                // const apiKey = "YOUR_API_KEY"; 
+                if (!apiKey && window.location.hostname !== 'localhost' && !window.location.hostname.includes('firebaseapp')) {
+                     // 在預覽環境中，apiKey 會由環境自動注入，如果是本地執行則需要手動填寫
+                }
                 
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+                // 注意：在預覽環境必須使用 gemini-2.5-flash-preview-09-2025
+                // 如果您下載後使用自己的 Key 遇到 404 錯誤，請將下方的模型名稱改為 'gemini-1.5-flash'
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                
                 const payload = { contents: [{ parts: [{ text: prompt }] }] };
                 
                 let retries = 0;
@@ -576,6 +583,7 @@
                         });
 
                         if (!response.ok) {
+                            // If 4xx error (client side), don't retry, throw immediately
                             if (response.status >= 400 && response.status < 500) {
                                 const errData = await response.json().catch(() => ({}));
                                 throw new Error(`API 請求錯誤 (${response.status}): ${errData.error?.message || response.statusText}`);
@@ -585,7 +593,7 @@
                         return await response.json();
                     } catch (error) {
                         if (retries === maxRetries || error.message.includes("API 請求錯誤")) throw error;
-                        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retries))); 
+                        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retries))); // Exponential backoff
                         retries++;
                     }
                 }
