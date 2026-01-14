@@ -310,12 +310,12 @@
                             <h2 className="text-lg font-bold text-white tracking-wide"><i className="fa-solid fa-chart-pie text-accent mr-2"></i>專案時程報表</h2>
                             <button onClick={onClose}><i className="fa-solid fa-times text-slate-400 text-lg hover:text-white"></i></button>
                         </div>
-                        <div className="p-4 sm:p-6 pb-2 grid grid-cols-2 gap-4">
+                        <div className="p-4 sm:p-6 pb-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">起始</label><input type="date" className="w-full glass-input px-3 py-2 rounded-lg text-sm" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} /></div>
                             <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">結束</label><input type="date" className="w-full glass-input px-3 py-2 rounded-lg text-sm" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} /></div>
                         </div>
                         <div className="flex-grow overflow-auto p-4 sm:p-6 custom-scrollbar">
-                            <table className="w-full text-left border-collapse min-w-[400px]">
+                            <table className="w-full text-left border-collapse">
                                 <thead><tr className="text-xs text-slate-400 uppercase border-b border-white/10"><th className="pb-3 pl-2">專案名稱</th><th className="pb-3">類別</th><th className="pb-3">月份</th><th className="pb-3">狀態</th></tr></thead>
                                 <tbody className="text-sm">
                                     {filteredData.map(p => (
@@ -523,7 +523,7 @@
                                     <input className="glass-input w-full px-4 py-2.5 rounded-lg" value={form.title} onChange={e=>setForm({...form, title:e.target.value})} placeholder="例如: 尾牙活動" />
                                 </div>
                                 <div><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">類別</label><select className="glass-input w-full px-4 py-2.5 rounded-lg" value={form.category} onChange={e=>setForm({...form, category:e.target.value})}>{['社群官網','設計','數位廣告','展覽','影片'].map(c=><option key={c} value={c} className="bg-slate-900">{c}</option>)}</select></div>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <div><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">開始</label><input type="date" className="glass-input w-full px-2 py-2.5 rounded-lg text-sm" value={form.startDate} onChange={e=>setForm({...form, startDate:e.target.value})} /></div>
                                     <div><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">結束</label><input type="date" className="glass-input w-full px-2 py-2.5 rounded-lg text-sm" value={form.deadline} onChange={e=>setForm({...form, deadline:e.target.value})} /></div>
                                 </div>
