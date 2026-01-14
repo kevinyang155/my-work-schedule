@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kevin Yang 工作進度 - Excel 匯出版</title>
@@ -596,9 +598,36 @@
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
+// 1. 初始化你的 Firebase (填入你剛才貼給我的那段)
+const firebaseConfig = {
+    apiKey: "AIzaSyDKNyqJCEbI5uCSUc4ws7dKuyBZA2lRaOA",
+    authDomain: "kevinwork-eb7cc.firebaseapp.com",
+    databaseURL: "https://kevinwork-eb7cc-default-rtdb.firebaseio.com",
+    projectId: "kevinwork-eb7cc",
+    storageBucket: "kevinwork-eb7cc.firebasestorage.app",
+    messagingSenderId: "462117666080",
+    appId: "1:462117666080:web:4289c00cc5144f98f6eb45"
+};
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+// 2. 儲存資料到雲端的功能 (範例)
+function saveToCloud(data) {
+    database.ref('mySchedule').set(data);
+    alert('資料已同步到雲端！');
+}
+
+// 3. 從雲端讀取資料的功能 (範例)
+database.ref('mySchedule').on('value', (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+        // 這裡寫：如何把讀取到的 data 顯示在你的時程表上
+        console.log("讀取到雲端資料：", data);
+    }
+});
 </script>
 
-// Import the functions you need from the SDKs you need import { initializeApp } from "firebase/app"; import { getAnalytics } from "firebase/analytics"; // TODO: Add SDKs for Firebase products that you want to use // https://firebase.google.com/docs/web/setup#available-libraries // Your web app's Firebase configuration // For Firebase JS SDK v7.20.0 and later, measurementId is optional const firebaseConfig = { apiKey: "AIzaSyDKNyqJCEbI5uCSUc4ws7dKuyBZA2lRaOA", authDomain: "kevinwork-eb7cc.firebaseapp.com", projectId: "kevinwork-eb7cc", storageBucket: "kevinwork-eb7cc.firebasestorage.app", messagingSenderId: "462117666080", appId: "1:462117666080:web:4289c00cc5144f98f6eb45", measurementId: "G-2DRK1D06QE" }; // Initialize Firebase const app = initializeApp(firebaseConfig); const analytics = getAnalytics(app);
+
 
 </body>
 </html>
