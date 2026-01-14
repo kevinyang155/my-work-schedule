@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kevin Yang 工作進度 - AI 強化版</title>
+    <title>Kevin Yang 工作進度 - Excel 匯出版</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -12,45 +12,40 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
         
+        :root {
+            --primary: #3b82f6;
+            --bg-dark: #0f172a;
+            --card-bg: #1e293b;
+        }
+
         body { 
-            font-family: 'Inter', 'Microsoft JhengHei', sans-serif; 
-            background-color: #0f172a; 
+            font-family: 'Plus Jakarta Sans', 'Microsoft JhengHei', sans-serif; 
+            background-color: var(--bg-dark); 
             color: #f1f5f9;
         }
 
         .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
         }
 
-        .neo-button {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .neo-button:hover {
-            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
-            transform: translateY(-2px);
-        }
-
-        .card-hover:hover {
-            border-color: rgba(59, 130, 246, 0.5);
-            background: rgba(30, 41, 59, 0.9);
-        }
-
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
 
-        /* AI Loading Animation */
-        .ai-glow {
-            animation: glow 2s ease-in-out infinite alternate;
+        @keyframes urgent-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
         }
-        @keyframes glow {
-            from { box-shadow: 0 0 5px -2px #6366f1; }
-            to { box-shadow: 0 0 15px 2px #6366f1; }
+        .animate-urgent {
+            animation: urgent-blink 1s infinite;
+        }
+
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.6s ease;
         }
     </style>
 </head>
@@ -59,32 +54,67 @@
 <div id="root"></div>
 
 <script type="text/babel">
-    const { useState, useEffect, useMemo } = React;
+    const { useState, useEffect, useMemo, useRef } = React;
 
     const CATEGORIES = {
-        '社群官網': 'border-cyan-500/50 text-cyan-400 bg-cyan-500/10',
-        '設計': 'border-rose-500/50 text-rose-400 bg-rose-500/10',
-        '數位廣告': 'border-indigo-500/50 text-indigo-400 bg-indigo-500/10',
-        '展覽': 'border-amber-500/50 text-amber-400 bg-amber-500/10',
-        '影片': 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10',
-        '其他': 'border-slate-500/50 text-slate-400 bg-slate-500/10'
+        '社群官網': 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10',
+        '設計': 'border-rose-500/30 text-rose-400 bg-rose-500/10',
+        '數位廣告': 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10',
+        '展覽': 'border-amber-500/30 text-amber-400 bg-amber-500/10',
+        '影片': 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+        '其他': 'border-slate-500/30 text-slate-400 bg-slate-500/10'
     };
 
-    // Gemini API 設定
     const apiKey = ""; 
 
-    function App() {
-        const STORAGE_KEY = 'myWorkScheduleDark_Original_V1';
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'kevin-yang-work-schedule';
+    async function fetchGemini(prompt, systemInstruction = "", isJson = false) {
+        let retries = 5;
+        let backoff = 1000;
         
+        const payload = {
+            contents: [{ parts: [{ text: prompt }] }],
+            systemInstruction: { parts: [{ text: systemInstruction }] }
+        };
+        
+        if (isJson) {
+            payload.generationConfig = { 
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: "ARRAY",
+                    items: { type: "STRING" }
+                }
+            };
+        }
+
+        while (retries > 0) {
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error('API Error');
+                const data = await res.json();
+                return data.candidates?.[0]?.content?.parts?.[0]?.text;
+            } catch (err) {
+                retries--;
+                if (retries === 0) throw err;
+                await new Promise(r => setTimeout(r, backoff));
+                backoff *= 2;
+            }
+        }
+    }
+
+    function App() {
+        const STORAGE_KEY = 'workSchedule_dark_v3_final';
         const [projects, setProjects] = useState(() => {
             const saved = localStorage.getItem(STORAGE_KEY);
             return saved ? JSON.parse(saved) : [];
         });
         const [filter, setFilter] = useState('all');
         const [isModalOpen, setIsModalOpen] = useState(false);
+        const [isReviewOpen, setIsReviewOpen] = useState(false);
         const [editingProject, setEditingProject] = useState(null);
-        const [deleteTarget, setDeleteTarget] = useState(null);
 
         useEffect(() => {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
@@ -104,155 +134,178 @@
         };
 
         const saveProject = (projectData) => {
+            let tasks = (projectData.subTasks || []).filter(t => t.text.trim() !== '');
+            if (tasks.length === 0) tasks = [{ text: projectData.name, done: false }];
+            const cleanedData = { ...projectData, subTasks: tasks };
+
             if (editingProject) {
-                setProjects(prev => prev.map(p => p.id === projectData.id ? projectData : p));
+                setProjects(prev => prev.map(p => p.id === cleanedData.id ? cleanedData : p));
             } else {
-                setProjects(prev => [{ ...projectData, id: Date.now() }, ...prev]);
+                setProjects(prev => [{ ...cleanedData, id: Date.now() }, ...prev]);
             }
             setIsModalOpen(false);
             setEditingProject(null);
         };
 
-        const executeDelete = () => {
-            if (deleteTarget) {
-                setProjects(prev => prev.filter(p => p.id !== deleteTarget.id));
-                setDeleteTarget(null);
+        const deleteProject = (id) => {
+            if(window.confirm('確定要刪除此專案嗎？')) {
+                setProjects(prev => prev.filter(p => p.id !== id));
             }
         };
 
         const toggleSubtask = (pid, idx) => {
             setProjects(prev => prev.map(p => {
                 if (p.id === pid) {
-                    const newTasks = p.subTasks.map((t, i) => i === idx ? { ...t, done: !t.done } : t);
+                    const newTasks = [...p.subTasks];
+                    newTasks[idx].done = !newTasks[idx].done;
                     return { ...p, subTasks: newTasks };
                 }
                 return p;
             }));
         };
 
+        const quickFinish = (pid) => {
+            setProjects(prev => prev.map(p => {
+                if (p.id === pid) {
+                    return { ...p, subTasks: p.subTasks.map(t => ({ ...t, done: true })) };
+                }
+                return p;
+            }));
+        };
+
+        const downloadICS = (project) => {
+            const formatDate = (d) => d.replace(/-/g, '');
+            const icsContent = [
+                'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//KevinYang//WorkSchedule//TW',
+                'BEGIN:VEVENT', `SUMMARY:[${project.category}] ${project.name}`,
+                `DTSTART;VALUE=DATE:${formatDate(project.startDate)}`,
+                `DTEND;VALUE=DATE:${formatDate(project.endDate)}`,
+                `DESCRIPTION:${(project.notes || '').replace(/\n/g, '\\n')}`,
+                'END:VEVENT', 'END:VCALENDAR'
+            ].join('\n');
+            const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `${project.name}.ics`);
+            link.click();
+        };
+
         const filteredProjects = useMemo(() => {
-            let sorted = [...projects].sort((a, b) => new Date(a.endDate) - new Date(b.endDate));
-            if (filter === 'completed') return sorted.filter(p => calculateProgress(p.subTasks) === 100);
-            if (filter === 'active') return sorted.filter(p => calculateProgress(p.subTasks) < 100);
-            return sorted;
+            let list = [...projects].sort((a, b) => new Date(a.endDate) - new Date(b.endDate));
+            if (filter === 'completed') return list.filter(p => calculateProgress(p.subTasks) === 100);
+            if (filter === 'active') return list.filter(p => calculateProgress(p.subTasks) < 100);
+            return list;
         }, [projects, filter]);
 
         return (
-            <div className="min-h-screen pb-20 px-4">
-                <header className="max-w-5xl mx-auto pt-10 pb-8 flex flex-col md:flex-row justify-between items-center gap-6">
-                    <h1 className="text-4xl font-extrabold tracking-tight text-white italic uppercase flex items-center">
-                        <span className="bg-blue-600 w-2 h-10 rounded-full mr-4"></span>
-                        Kevin Yang 工作進度
-                    </h1>
-                    <button 
-                        onClick={() => { setEditingProject(null); setIsModalOpen(true); }}
-                        className="neo-button bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg"
-                    >
-                        + NEW PROJECT
-                    </button>
+            <div className="max-w-4xl mx-auto py-12 px-6">
+                <header className="flex justify-between items-end mb-12">
+                    <div>
+                        <h1 className="text-3xl font-extrabold tracking-tight text-white mb-1 uppercase">Kevin Yang</h1>
+                        <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">✨ 專業工作報告版</p>
+                    </div>
+                    <div className="flex gap-3">
+                        <button onClick={() => setIsReviewOpen(true)} className="bg-slate-800 hover:bg-slate-700 text-blue-400 px-5 py-3 rounded-xl font-bold transition-all border border-blue-500/20 flex items-center gap-2">
+                            <i className="fas fa-file-alt"></i> 一般成果報告
+                        </button>
+                        <button onClick={() => { setEditingProject(null); setIsModalOpen(true); }} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-600/20">
+                            + 新增專案
+                        </button>
+                    </div>
                 </header>
 
-                <main className="max-w-5xl mx-auto">
-                    <div className="flex space-x-2 mb-8 bg-slate-800/50 p-1.5 rounded-2xl w-fit">
-                        {['all', 'active', 'completed'].map(f => (
-                            <button key={f} onClick={() => setFilter(f)}
-                                className={`px-6 py-2 rounded-xl text-sm font-semibold transition-all ${filter === f ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400'}`}>
-                                {f === 'all' ? '全部' : f === 'active' ? '進行中' : '已完成'}
-                            </button>
-                        ))}
-                    </div>
+                <div className="flex gap-4 mb-8">
+                    {['all', 'active', 'completed'].map(f => (
+                        <button key={f} onClick={() => setFilter(f)}
+                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${filter === f ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}>
+                            {f === 'all' ? '全部' : f === 'active' ? '執行中' : '已完成'}
+                        </button>
+                    ))}
+                </div>
 
-                    <div className="grid grid-cols-1 gap-4">
-                        {filteredProjects.map(p => (
-                            <ProjectCard 
-                                key={p.id} project={p} 
-                                onEdit={() => { setEditingProject(p); setIsModalOpen(true); }}
-                                onDelete={() => setDeleteTarget(p)}
-                                onToggle={toggleSubtask}
-                                calc={calculateProgress}
-                                rem={getRemainingDays}
-                            />
-                        ))}
-                    </div>
-                </main>
+                <div className="space-y-4">
+                    {filteredProjects.map(p => (
+                        <ProjectCard key={p.id} project={p} onEdit={() => { setEditingProject(p); setIsModalOpen(true); }} onDelete={() => deleteProject(p.id)} onToggle={toggleSubtask} onQuickFinish={() => quickFinish(p.id)} onICS={() => downloadICS(p)} calc={calculateProgress} rem={getRemainingDays} />
+                    ))}
+                </div>
 
                 {isModalOpen && <ProjectModal project={editingProject} onSave={saveProject} onClose={() => setIsModalOpen(false)} />}
-                
-                {deleteTarget && (
-                    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-                        <div className="glass-panel w-full max-w-sm rounded-3xl p-8 text-center">
-                            <i className="fas fa-trash-alt text-rose-500 text-3xl mb-4"></i>
-                            <h3 className="text-xl font-bold mb-2 text-white">確認刪除專案？</h3>
-                            <p className="text-slate-400 text-sm mb-8">「{deleteTarget.name}」將會被永久刪除。</p>
-                            <div className="flex gap-3">
-                                <button onClick={() => setDeleteTarget(null)} className="flex-1 py-3 rounded-xl bg-slate-800 font-bold">取消</button>
-                                <button onClick={executeDelete} className="flex-1 py-3 rounded-xl bg-rose-600 font-bold text-white shadow-lg">確認</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {isReviewOpen && <GeneralReviewModal projects={projects} onClose={() => setIsReviewOpen(false)} />}
             </div>
         );
     }
 
-    function ProjectCard({ project, onEdit, onDelete, onToggle, calc, rem }) {
-        const [isExp, setIsExp] = useState(false);
+    function ProjectCard({ project, onEdit, onDelete, onToggle, onQuickFinish, onICS, calc, rem }) {
+        const [isExpanded, setIsExpanded] = useState(false);
         const progress = calc(project.subTasks);
         const days = rem(project.endDate);
+        const isUrgent = days >= 0 && days <= 3 && progress < 100;
 
         return (
-            <div className={`glass-panel rounded-3xl overflow-hidden card-hover transition-all ${isExp ? 'ring-1 ring-blue-500/30 shadow-2xl' : ''}`}>
-                <div className="p-5 flex items-center justify-between cursor-pointer" onClick={() => setIsExp(!isExp)}>
-                    <div className="flex items-center gap-6 flex-1 min-w-0">
-                        <div className="relative w-12 h-12 shrink-0">
+            <div className={`glass-panel rounded-2xl overflow-hidden transition-all ${isUrgent ? 'border-rose-500/30 bg-rose-500/[0.02]' : ''}`}>
+                <div className="p-5 flex items-center justify-between cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+                    <div className="flex items-center gap-6 flex-1">
+                        <div className="relative w-12 h-12 flex items-center justify-center shrink-0">
                             <svg className="w-full h-full transform -rotate-90">
-                                <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-slate-700"/>
-                                <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="4" fill="transparent" 
-                                    strokeDasharray={125.6} strokeDashoffset={125.6 - (125.6 * progress) / 100}
-                                    className={`${progress === 100 ? 'text-emerald-400' : 'text-blue-500'} transition-all duration-700`}
-                                />
+                                <circle cx="24" cy="24" r="20" stroke="#334155" strokeWidth="3" fill="transparent" />
+                                <circle cx="24" cy="24" r="20" stroke={progress === 100 ? '#10b981' : isUrgent ? '#f43f5e' : '#3b82f6'} strokeWidth="3" fill="transparent" 
+                                    strokeDasharray="125.6" strokeDashoffset={125.6 - (125.6 * progress) / 100} className="progress-ring-circle" />
                             </svg>
-                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white">{progress}%</span>
+                            <span className={`absolute text-[10px] font-bold ${isUrgent ? 'text-rose-400' : ''}`}>{progress}%</span>
                         </div>
                         <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-3 mb-1">
-                                <span className={`shrink-0 border px-2 py-0.5 rounded-lg text-[10px] font-bold ${CATEGORIES[project.category]}`}>{project.category}</span>
-                                <h3 className="text-lg font-bold truncate text-white uppercase">{project.name}</h3>
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${CATEGORIES[project.category]}`}>{project.category}</span>
+                                <h3 className="font-bold text-white truncate">{project.name}</h3>
+                                {isUrgent && <i className="fas fa-bolt text-rose-500 text-xs animate-urgent"></i>}
                             </div>
-                            <div className="flex gap-4 text-xs text-slate-400">
-                                <span>截止 {project.endDate}</span>
-                                <span className={days <= 3 && progress < 100 ? 'text-rose-400 font-bold' : ''}>
-                                    {days < 0 ? `逾期 ${Math.abs(days)}` : days === 0 ? '今天截止' : `剩餘 ${days} 天`}
+                            <div className="text-[11px] font-medium flex items-center gap-3 text-slate-500">
+                                <span>截止：{project.endDate}</span>
+                                <span className={isUrgent ? 'text-rose-400 animate-urgent' : 'text-slate-400'}>
+                                    {days < 0 ? `逾期 ${Math.abs(days)} 天` : days === 0 ? '今日截止' : `剩餘 ${days} 天`}
                                 </span>
                             </div>
                         </div>
                     </div>
-                    <i className={`fas fa-chevron-right text-slate-600 transition-transform ${isExp ? 'rotate-90' : ''}`}></i>
+                    <div className="flex items-center gap-4">
+                        {progress < 100 && (
+                             <button onClick={(e) => { e.stopPropagation(); onQuickFinish(); }} className="text-[10px] bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg border border-emerald-500/20 font-bold transition-all">快速結案</button>
+                        )}
+                        <i className={`fas fa-chevron-down text-slate-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`}></i>
+                    </div>
                 </div>
 
-                {isExp && (
-                    <div className="px-6 pb-6 pt-2">
-                        <div className="h-px bg-slate-700/50 mb-6"></div>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {isExpanded && (
+                    <div className="px-6 pb-6 pt-2 bg-slate-900/20 border-t border-white/5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
                             <div>
-                                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">子任務</h4>
-                                <div className="space-y-2">
-                                    {project.subTasks.map((t, i) => (
-                                        <label key={i} className="flex items-center gap-4 bg-slate-800/30 p-3 rounded-2xl cursor-pointer">
-                                            <input type="checkbox" checked={t.done} onChange={() => onToggle(project.id, i)} className="w-5 h-5 rounded border-2 border-slate-600 checked:bg-blue-600" />
-                                            <span className={`text-sm ${t.done ? 'text-slate-500 line-through' : 'text-slate-200'}`}>{t.text}</span>
-                                        </label>
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">工作子任務</p>
+                                <div className="space-y-2 mb-6">
+                                    {(project.subTasks || []).map((t, i) => (
+                                        <div key={i} className="flex items-center gap-3 p-3 bg-slate-800/40 rounded-xl border border-white/5 cursor-pointer hover:bg-slate-700/40 transition-colors" onClick={() => onToggle(project.id, i)}>
+                                            <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-all ${t.done ? 'bg-blue-600 border-transparent' : 'border-slate-600'}`}>
+                                                {t.done && <i className="fas fa-check text-[10px] text-white"></i>}
+                                            </div>
+                                            <span className={`text-sm ${t.done ? 'text-slate-500 line-through' : 'text-slate-300'}`}>{t.text}</span>
+                                        </div>
                                     ))}
                                 </div>
-                            </div>
-                            <div className="space-y-6">
-                                <div>
-                                    <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">備註</h4>
-                                    <div className="bg-slate-800/50 p-4 rounded-2xl text-sm text-slate-300 min-h-[80px] whitespace-pre-wrap border border-slate-700">{project.notes || '無'}</div>
+                                <div className="text-[11px] font-bold text-slate-500 flex justify-between">
+                                    <span>開始日期：{project.startDate}</span>
+                                    <button onClick={onDelete} className="text-rose-500/50 hover:text-rose-500">刪除專案</button>
                                 </div>
-                                <div className="flex gap-3">
-                                    <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 bg-slate-700 py-3 rounded-xl text-xs font-bold hover:bg-slate-600">編輯</button>
-                                    <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="w-12 h-12 bg-rose-600/20 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all"><i className="fas fa-trash-alt"></i></button>
+                            </div>
+                            <div className="flex flex-col">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">專案備註</p>
+                                <div className="bg-slate-800/40 p-5 rounded-2xl border border-white/5 text-xs text-slate-400 whitespace-pre-wrap leading-relaxed flex-1 overflow-y-auto max-h-48 custom-scroll mb-4">
+                                    {project.notes || "尚未填寫備註細節。"}
+                                </div>
+                                
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">功能操作</p>
+                                <div className="grid grid-cols-1 gap-3">
+                                    <button onClick={onEdit} className="py-3.5 bg-slate-700 hover:bg-slate-600 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 text-white"><i className="fas fa-edit"></i> 編輯內容</button>
+                                    <button onClick={onICS} className="py-3.5 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white rounded-xl text-xs font-bold transition-all border border-blue-500/20 flex items-center justify-center gap-2"><i className="fas fa-calendar-alt"></i> 匯出日曆</button>
                                 </div>
                             </div>
                         </div>
@@ -263,143 +316,124 @@
     }
 
     function ProjectModal({ project, onSave, onClose }) {
-        const [form, setForm] = useState(project || {
-            category: '社群官網', name: '', startDate: new Date().toISOString().split('T')[0],
-            endDate: new Date().toISOString().split('T')[0], notes: '', subTasks: [{text:'', done:false}]
+        const [form, setForm] = useState(project ? { ...project } : {
+            category: '社群官網', name: '', 
+            startDate: new Date().toISOString().split('T')[0],
+            endDate: new Date().toISOString().split('T')[0], 
+            notes: '', 
+            subTasks: [{text:'', done:false}]
         });
-        const [loadingAi, setLoadingAi] = useState(false);
+        const [aiState, setAiState] = useState({ tasks: false });
+        const taskInputRefs = useRef([]);
 
-        const callGemini = async (prompt, systemInstruction) => {
-            setLoadingAi(true);
-            let retries = 0;
-            const maxRetries = 5;
-            
-            const makeRequest = async () => {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        systemInstruction: { parts: [{ text: systemInstruction }] },
-                        generationConfig: { responseMimeType: "application/json" }
-                    })
-                });
-                if (!response.ok) throw new Error('API Error');
-                return await response.json();
-            };
-
+        const generateSubtasks = async () => {
+            if (!form.name.trim() || aiState.tasks) return;
+            setAiState({ tasks: true });
             try {
-                while (retries < maxRetries) {
-                    try {
-                        const data = await makeRequest();
-                        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                        return JSON.parse(text);
-                    } catch (e) {
-                        retries++;
-                        if (retries === maxRetries) throw e;
-                        await new Promise(r => setTimeout(r, Math.pow(2, retries) * 500));
-                    }
+                const text = await fetchGemini(`專案名稱：${form.name}\n類別：${form.category}`, `拆解為 5-7 個具體、可執行的子任務。格式：純字串陣列的 JSON。`, true);
+                const result = JSON.parse(text);
+                if (Array.isArray(result)) setForm(prev => ({ ...prev, subTasks: result.map(t => ({ text: t, done: false })) }));
+            } catch (err) { console.error(err); } finally { setAiState({ tasks: false }); }
+        };
+
+        const updateTask = (idx, val) => {
+            const s = [...form.subTasks];
+            s[idx].text = val;
+            setForm({...form, subTasks: s});
+        };
+
+        const handleTaskKeyDown = (e, idx) => {
+            if (e.key === 'Enter') {
+                e.preventDefault(); 
+                if (form.subTasks[idx].text.trim() !== '') {
+                    const newTasks = [...form.subTasks];
+                    newTasks.splice(idx + 1, 0, { text: '', done: false });
+                    setForm({ ...form, subTasks: newTasks });
+                    setTimeout(() => {
+                        taskInputRefs.current[idx + 1]?.focus();
+                    }, 0);
                 }
-            } catch (err) {
-                console.error(err);
-                return null;
-            } finally {
-                setLoadingAi(false);
-            }
-        };
-
-        const aiGenerateTasks = async () => {
-            if (!form.name) return;
-            const result = await callGemini(
-                `專案類別: ${form.category}, 專案名稱: ${form.name}`,
-                "你是一個資深專案經理。請根據專案名稱拆解出 3 到 5 個具體的子任務清單。請以 JSON 格式回傳，格式如：{\"tasks\": [\"任務1\", \"任務2\"]}"
-            );
-            if (result && result.tasks) {
-                setForm(prev => ({
-                    ...prev,
-                    subTasks: result.tasks.map(t => ({ text: t, done: false }))
-                }));
-            }
-        };
-
-        const aiSuggestNotes = async () => {
-            if (!form.name) return;
-            const result = await callGemini(
-                `專案類別: ${form.category}, 專案名稱: ${form.name}`,
-                "你是一個專業的助理。請為這個專案生成一段約 50 字的專業建議備註，包含注意事項或目標。請以 JSON 格式回傳，格式如：{\"notes\": \"建議內容...\"}"
-            );
-            if (result && result.notes) {
-                setForm(prev => ({ ...prev, notes: result.notes }));
             }
         };
 
         return (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[80] p-4">
-                <div className="glass-panel w-full max-w-xl rounded-3xl p-8 max-h-[90vh] overflow-y-auto custom-scroll shadow-2xl relative">
-                    {loadingAi && (
-                        <div className="absolute top-4 right-12 flex items-center gap-2 text-indigo-400 text-xs font-bold animate-pulse">
-                            <i className="fas fa-robot"></i> AI 思考中...
-                        </div>
-                    )}
-                    
-                    <h2 className="text-2xl font-black text-white italic mb-8 uppercase flex items-center gap-3">
-                        專案設定
-                    </h2>
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[100] p-4">
+                <div className="bg-slate-900 w-full max-w-2xl rounded-[2rem] p-10 max-h-[90vh] overflow-y-auto custom-scroll border border-white/10 shadow-2xl">
+                    <div className="flex justify-between items-center mb-8 text-white">
+                        <h2 className="text-2xl font-bold">{project ? '編輯專案' : '新增專案'}</h2>
+                        <button onClick={onClose}><i className="fas fa-times"></i></button>
+                    </div>
                     
                     <form onSubmit={e => { e.preventDefault(); onSave(form); }} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <input required className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-4 text-sm text-white focus:border-blue-500 outline-none transition-all" placeholder="專案名稱" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
-                            <select className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-4 text-sm text-white outline-none" value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest ml-1">專案名稱</label>
+                            <input 
+                                required 
+                                className="w-full bg-slate-800/50 border border-slate-700 rounded-2xl p-4 text-sm text-white focus:border-blue-500/50 outline-none" 
+                                value={form.name} 
+                                onChange={e => setForm({...form, name: e.target.value})} 
+                                onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest ml-1">分類類別</label>
+                             <select className="w-full bg-slate-800/50 border border-slate-700 rounded-2xl p-4 text-sm text-white appearance-none outline-none" value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
                                 {Object.keys(CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
+                             </select>
                         </div>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                            <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-4 text-sm text-white" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} />
-                            <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-4 text-sm text-white" value={form.endDate} onChange={e => setForm({...form, endDate: e.target.value})} />
+
+                        <div className="grid grid-cols-2 gap-5">
+                            <div className="space-y-2">
+                                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest ml-1">開始日期</label>
+                                <input type="date" className="w-full bg-slate-800/50 border border-slate-700 rounded-2xl p-4 text-sm text-white outline-none" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest ml-1">最終截止日</label>
+                                <input type="date" className="w-full bg-slate-800/50 border border-slate-700 rounded-2xl p-4 text-sm text-white outline-none" value={form.endDate} onChange={e => setForm({...form, endDate: e.target.value})} />
+                            </div>
                         </div>
-                        
-                        <div className="space-y-3">
+
+                        <div className="space-y-4">
                             <div className="flex justify-between items-center">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">子任務</label>
-                                <button 
-                                    type="button" 
-                                    onClick={aiGenerateTasks}
-                                    disabled={!form.name || loadingAi}
-                                    className="text-[10px] bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white px-3 py-1 rounded-full font-bold transition-all disabled:opacity-50"
-                                >
-                                    <i className="fas fa-magic mr-1"></i> ✨ AI 自動拆解
+                                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">任務拆解 (Enter 新增下一項)</label>
+                                <button type="button" onClick={generateSubtasks} disabled={aiState.tasks || !form.name} className="text-white text-[10px] font-bold px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-all">
+                                    {aiState.tasks ? <i className="fas fa-circle-notch fa-spin"></i> : 'AI 智能拆解'}
                                 </button>
                             </div>
-                            {form.subTasks.map((t, idx) => (
-                                <div key={idx} className="flex gap-2 mb-2">
-                                    <input className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm text-white" value={t.text} onChange={e => {
-                                        const s = [...form.subTasks]; s[idx].text = e.target.value; setForm({...form, subTasks: s});
-                                    }} />
-                                    <button type="button" onClick={() => setForm({...form, subTasks: form.subTasks.filter((_, i) => i !== idx)})} className="text-rose-500 hover:text-rose-400 transition-colors"><i className="fas fa-minus-circle"></i></button>
-                                </div>
-                            ))}
-                            <button type="button" onClick={() => setForm({...form, subTasks: [...form.subTasks, {text:'', done:false}]})} className="text-xs text-blue-500 font-bold hover:text-blue-400 transition-colors">+ 新增細項</button>
-                        </div>
-                        
-                        <div className="space-y-3">
-                            <div className="flex justify-between items-center">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">備註</label>
-                                <button 
-                                    type="button" 
-                                    onClick={aiSuggestNotes}
-                                    disabled={!form.name || loadingAi}
-                                    className="text-[10px] bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white px-3 py-1 rounded-full font-bold transition-all disabled:opacity-50"
-                                >
-                                    <i className="fas fa-sparkles mr-1"></i> ✨ AI 建議備註
-                                </button>
+                            <div className="space-y-2">
+                                {(form.subTasks || []).map((t, idx) => (
+                                    <div key={idx} className="flex gap-2 items-center group">
+                                        <input 
+                                            ref={el => taskInputRefs.current[idx] = el}
+                                            className="flex-1 bg-slate-800/50 border border-slate-700 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500/30" 
+                                            value={t.text} 
+                                            onChange={e => updateTask(idx, e.target.value)} 
+                                            onKeyDown={e => handleTaskKeyDown(e, idx)}
+                                            placeholder="輸入任務後按 Enter..." 
+                                        />
+                                        <button type="button" onClick={() => {
+                                            const s = [...form.subTasks]; 
+                                            if (s.length > 1) s.splice(idx, 1); else s[0].text = '';
+                                            setForm({...form, subTasks: s});
+                                        }} className="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100"><i className="fas fa-trash-alt"></i></button>
+                                    </div>
+                                ))}
+                                <button type="button" onClick={() => {
+                                    setForm({...form, subTasks: [...form.subTasks, {text:'', done:false}]});
+                                    setTimeout(() => taskInputRefs.current[form.subTasks.length]?.focus(), 0);
+                                }} className="w-full text-[11px] text-slate-500 py-3 border border-dashed border-slate-700 rounded-xl">+ 手動新增任務</button>
                             </div>
-                            <textarea rows="3" className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-4 text-sm text-white focus:border-blue-500 outline-none transition-all" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
                         </div>
-                        
-                        <div className="flex gap-4 pt-4">
-                            <button type="button" onClick={onClose} className="flex-1 py-4 font-bold text-slate-400 hover:text-slate-200 transition-colors">取消</button>
-                            <button type="submit" className="flex-1 bg-blue-600 py-4 rounded-2xl font-bold text-white shadow-lg hover:bg-blue-500 transition-all">儲存變更</button>
+
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest ml-1">專案備註資訊</label>
+                            <textarea className="w-full bg-slate-800/50 border border-slate-700 rounded-2xl p-4 text-sm text-white h-28 outline-none focus:border-blue-500/30 resize-none custom-scroll" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} placeholder="補充其他詳細備註..." />
+                        </div>
+
+                        <div className="pt-4 flex gap-4">
+                            <button type="button" onClick={onClose} className="flex-1 py-4 text-slate-500 font-bold text-xs uppercase hover:text-white">取消</button>
+                            <button type="submit" disabled={!form.name.trim()} className="flex-[2] bg-blue-600 disabled:bg-slate-700 py-4 rounded-2xl font-bold text-white text-xs uppercase shadow-lg shadow-blue-600/20">儲存變更</button>
                         </div>
                     </form>
                 </div>
@@ -407,9 +441,164 @@
         );
     }
 
+    function GeneralReviewModal({ projects, onClose }) {
+        const [startDate, setStartDate] = useState(() => `${new Date().getFullYear()}-01-01`);
+        const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+
+        const filteredProjects = useMemo(() => {
+            const s = new Date(startDate);
+            const e = new Date(endDate);
+            return projects.filter(p => {
+                const pDate = new Date(p.endDate);
+                return pDate >= s && pDate <= e;
+            }).sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+        }, [projects, startDate, endDate]);
+
+        const getMonthRange = (s, e) => {
+            const start = new Date(s);
+            const end = new Date(e);
+            if (start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
+                return `${start.getMonth() + 1}月`;
+            }
+            return `${start.getMonth() + 1}月 - ${end.getMonth() + 1}月`;
+        };
+
+        const exportToExcel = () => {
+            if (filteredProjects.length === 0) return;
+
+            // 定義 CSV 標頭
+            const headers = ['執行月份', '專案名稱', '類別', '狀態', '進度(%)', '開始日期', '結束日期'];
+            
+            // 轉換資料行
+            const rows = filteredProjects.map(p => {
+                const isDone = p.subTasks.every(t => t.done);
+                const progress = Math.round((p.subTasks.filter(t => t.done).length / p.subTasks.length) * 100);
+                return [
+                    getMonthRange(p.startDate, p.endDate),
+                    p.name.replace(/,/g, ' '), // 移除逗號避免破壞 CSV
+                    p.category,
+                    isDone ? '已完成' : '執行中',
+                    `${progress}%`,
+                    p.startDate,
+                    p.endDate
+                ];
+            });
+
+            // 合併成 CSV 字串 (加上 BOM 以確保 Excel 正確辨識 UTF-8 繁體中文)
+            const csvContent = "\uFEFF" + [headers, ...rows].map(e => e.join(",")).join("\n");
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `工作報告_${startDate}_至_${endDate}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        return (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[110] p-4">
+                <div className="bg-slate-900 w-full max-w-4xl rounded-[2rem] border border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                    <div className="p-8 border-b border-white/5 flex justify-between items-center text-white font-bold">
+                        <div className="flex items-center gap-3">
+                            <i className="fas fa-file-alt text-blue-500"></i>
+                            <h2 className="text-2xl">工作成果報告清單</h2>
+                        </div>
+                        <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors"><i className="fas fa-times text-xl"></i></button>
+                    </div>
+                    
+                    <div className="bg-slate-800/40 p-6 flex flex-wrap gap-6 items-end border-b border-white/5">
+                        <div className="space-y-1">
+                            <label className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">篩選起日</label>
+                            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-xs text-white outline-none focus:border-blue-500/50 w-40" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">篩選迄日</label>
+                            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-xs text-white outline-none focus:border-blue-500/50 w-40" />
+                        </div>
+                        <div className="ml-auto flex items-center gap-4">
+                            <div className="text-right">
+                                <p className="text-[10px] text-slate-500 font-bold uppercase">專案總數</p>
+                                <p className="text-xl font-extrabold text-white">{filteredProjects.length}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-8 custom-scroll bg-slate-900">
+                        {filteredProjects.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-white/5">
+                                            <th className="py-4 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">執行月份</th>
+                                            <th className="py-4 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">專案名稱</th>
+                                            <th className="py-4 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">狀態</th>
+                                            <th className="py-4 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">進度</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                        {filteredProjects.map(p => {
+                                            const isDone = p.subTasks.every(t => t.done);
+                                            const progress = Math.round((p.subTasks.filter(t => t.done).length / p.subTasks.length) * 100);
+                                            return (
+                                                <tr key={p.id} className="hover:bg-white/[0.02] transition-colors">
+                                                    <td className="py-5 px-4 text-xs font-medium text-slate-400">
+                                                        {getMonthRange(p.startDate, p.endDate)}
+                                                    </td>
+                                                    <td className="py-5 px-4">
+                                                        <div className="text-sm font-bold text-white mb-0.5">{p.name}</div>
+                                                        <div className="text-[10px] text-slate-500">{p.category}</div>
+                                                    </td>
+                                                    <td className="py-5 px-4 text-center">
+                                                        {isDone ? (
+                                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                                                已完成
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                                                執行中
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-5 px-4 text-right">
+                                                        <span className={`text-xs font-mono font-bold ${isDone ? 'text-emerald-400' : 'text-slate-400'}`}>
+                                                            {progress}%
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-20 text-slate-600">
+                                <i className="fas fa-folder-open text-4xl mb-4 opacity-20"></i>
+                                <p className="text-sm font-bold">此期間內沒有專案數據</p>
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div className="p-6 bg-slate-800/20 border-t border-white/5 flex justify-end">
+                        <button 
+                            onClick={exportToExcel} 
+                            disabled={filteredProjects.length === 0}
+                            className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-900/20"
+                        >
+                            <i className="fas fa-file-excel"></i> 匯出 Excel (CSV)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />); 
+    root.render(<App />);
 </script>
+
+// Import the functions you need from the SDKs you need import { initializeApp } from "firebase/app"; import { getAnalytics } from "firebase/analytics"; // TODO: Add SDKs for Firebase products that you want to use // https://firebase.google.com/docs/web/setup#available-libraries // Your web app's Firebase configuration // For Firebase JS SDK v7.20.0 and later, measurementId is optional const firebaseConfig = { apiKey: "AIzaSyDKNyqJCEbI5uCSUc4ws7dKuyBZA2lRaOA", authDomain: "kevinwork-eb7cc.firebaseapp.com", projectId: "kevinwork-eb7cc", storageBucket: "kevinwork-eb7cc.firebasestorage.app", messagingSenderId: "462117666080", appId: "1:462117666080:web:4289c00cc5144f98f6eb45", measurementId: "G-2DRK1D06QE" }; // Initialize Firebase const app = initializeApp(firebaseConfig); const analytics = getAnalytics(app);
 
 </body>
 </html>
