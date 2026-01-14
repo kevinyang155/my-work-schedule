@@ -171,8 +171,9 @@
         const db = getFirestore(app);
         const analytics = getAnalytics(app);
         
-        // 修改處：將 appId 固定，確保跨裝置、跨環境都能讀取到同一份資料
-        const appId = 'kevin-dashboard-sync-v1';
+        // CRITICAL FIX: Use a hardcoded, consistent app ID for persistence across refreshes and devices.
+        // DO NOT use __app_id which changes dynamically in preview environments.
+        const appId = 'kevin-project-manager-v1';
 
         window.db = db;
         window.auth = auth;
