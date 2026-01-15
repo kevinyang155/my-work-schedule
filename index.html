@@ -42,14 +42,14 @@
                 extend: {
                     colors: {
                         bgDark: '#0f172a',
-                        glass: 'rgba(30, 41, 59, 0.7)', // Restored prettier opacity
+                        glass: 'rgba(30, 41, 59, 0.7)',
                         glassHover: 'rgba(51, 65, 85, 0.8)',
                         accent: '#3b82f6',
                         accentGlow: 'rgba(59, 130, 246, 0.5)',
                     },
                     boxShadow: {
                         'glow': '0 0 15px rgba(59, 130, 246, 0.4)',
-                        'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.37)', // Restored glass shadow
+                        'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
                     },
                     animation: {
                         'fade-in': 'fadeIn 0.3s ease-out',
@@ -57,14 +57,8 @@
                         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                     },
                     keyframes: {
-                        fadeIn: {
-                            '0%': { opacity: '0' },
-                            '100%': { opacity: '1' },
-                        },
-                        slideUp: {
-                            '0%': { transform: 'translateY(20px)', opacity: '0' },
-                            '100%': { transform: 'translateY(0)', opacity: '1' },
-                        }
+                        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+                        slideUp: { '0%': { transform: 'translateY(20px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } }
                     }
                 }
             }
@@ -72,82 +66,17 @@
     </script>
 
     <style>
-        body {
-            background-color: #0f172a;
-            color: #f1f5f9;
-            font-family: 'Inter', 'Microsoft JhengHei', sans-serif;
-            overflow-x: hidden;
-        }
-
-        /* Restored Visual Styles */
-        .glass-panel {
-            background: rgba(30, 41, 59, 0.6);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
-
-        .glass-input {
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: white;
-            transition: all 0.3s ease;
-        }
-        .glass-input:focus {
-            background: rgba(15, 23, 42, 0.8);
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-            outline: none;
-        }
-
-        /* Checkbox Customization */
-        .custom-checkbox {
-            appearance: none;
-            background-color: rgba(255,255,255,0.05);
-            margin: 0;
-            font: inherit;
-            width: 1.2em;
-            height: 1.2em;
-            border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 0.25em;
-            display: grid;
-            place-content: center;
-            cursor: pointer;
-            transition: all 0.2s ease-in-out;
-        }
-        .custom-checkbox::before {
-            content: "";
-            width: 0.65em;
-            height: 0.65em;
-            transform: scale(0);
-            transition: 120ms transform ease-in-out;
-            box-shadow: inset 1em 1em white;
-            transform-origin: center;
-            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
-        }
-        .custom-checkbox:checked {
-            background-color: #3b82f6;
-            border-color: #3b82f6;
-        }
-        .custom-checkbox:checked::before {
-            transform: scale(1);
-        }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0f172a; 
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #334155; 
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569; 
-        }
+        body { background-color: #0f172a; color: #f1f5f9; font-family: 'Inter', 'Microsoft JhengHei', sans-serif; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+        .glass-panel { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .glass-input { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: white; transition: all 0.3s ease; }
+        .glass-input:focus { background: rgba(15, 23, 42, 0.8); border-color: #3b82f6; outline: none; }
+        .custom-checkbox { appearance: none; background-color: rgba(255,255,255,0.05); width: 1.2em; height: 1.2em; border: 1px solid rgba(255,255,255,0.3); border-radius: 0.25em; display: grid; place-content: center; cursor: pointer; }
+        .custom-checkbox::before { content: ""; width: 0.65em; height: 0.65em; transform: scale(0); transition: 120ms transform ease-in-out; box-shadow: inset 1em 1em white; clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%); }
+        .custom-checkbox:checked { background-color: #3b82f6; border-color: #3b82f6; }
+        .custom-checkbox:checked::before { transform: scale(1); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -156,10 +85,9 @@
     <script type="module">
         import { initializeApp } from "firebase/app";
         import { getAuth, signInWithPopup, GoogleAuthProvider, signInAnonymously, onAuthStateChanged, signOut, signInWithCustomToken } from "firebase/auth";
-        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc } from "firebase/firestore";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, getDoc } from "firebase/firestore";
         import { getAnalytics } from "firebase/analytics";
 
-        // Config logic
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyDKNyqJCEbI5uCSUc4ws7dKuyBZA2lRaOA",
             authDomain: "kevinwork-eb7cc.firebaseapp.com",
@@ -174,9 +102,7 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        
-        // FIXED ID for syncing
-        const appId = 'kevin-dashboard-pro-v1';
+        const appId = 'kevin-dashboard-pro-v1'; 
 
         window.db = db;
         window.auth = auth;
@@ -191,6 +117,7 @@
         window.updateDoc = updateDoc;
         window.deleteDoc = deleteDoc;
         window.doc = doc;
+        window.getDoc = getDoc;
         window.onSnapshot = onSnapshot;
         window.setDoc = setDoc;
         window.signInWithCustomToken = signInWithCustomToken;
@@ -199,11 +126,8 @@
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
-        
-        // ⚠️ 請填入您的 AI Studio Key (免費申請: aistudio.google.com)
-        const apiKey = ""; 
+        const apiKey = ""; // ⚠️ 請填入新的 API Key
 
-        // --- ICS Export ---
         const downloadICS = (project) => {
             const formatDate = (d) => d.replace(/-/g, '');
             const getNextDay = (d) => { if(!d) return ''; const date = new Date(d); date.setDate(date.getDate() + 1); return date.toISOString().split('T')[0].replace(/-/g, ''); };
@@ -221,9 +145,7 @@
             document.body.appendChild(link); link.click(); document.body.removeChild(link);
         };
 
-        // --- Components ---
-
-        const LoginScreen = ({ onLogin, onGuest }) => (
+        const LoginScreen = ({ onLogin, onGuest, authError }) => (
             <div className="min-h-screen flex items-center justify-center p-4 relative">
                 <div className="fixed top-[-20%] left-[-10%] w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[128px] pointer-events-none"></div>
                 <div className="fixed bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-purple-600/15 rounded-full blur-[128px] pointer-events-none"></div>
@@ -235,6 +157,14 @@
                         <h1 className="text-3xl font-black italic tracking-tighter text-white mb-2">Kevin Yang</h1>
                         <p className="text-slate-400 text-sm">專案進度管理儀表板</p>
                     </div>
+
+                    {authError && (
+                        <div className="bg-red-500/20 border border-red-500/50 text-red-200 px-4 py-3 rounded-lg text-sm mb-6 flex items-start gap-3 text-left animate-pulse">
+                            <i className="fa-solid fa-circle-exclamation mt-0.5 shrink-0"></i>
+                            <span>{authError}</span>
+                        </div>
+                    )}
+
                     <div className="space-y-4">
                         <button onClick={onLogin} className="w-full bg-white text-slate-900 font-bold py-3 px-4 rounded-xl hover:bg-slate-100 flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg">
                             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="G" /> 使用 Google 帳號登入
@@ -552,28 +482,37 @@
             const [projects, setProjects] = useState([]);
             const [ui, setUi] = useState({ modal:false, report:false, delete:false, editId:null, delId:null, filter:'all' });
             const [loading, setLoading] = useState(true);
+            const [authError, setAuthError] = useState('');
 
             useEffect(() => {
-                // 定義白名單 (請在此填入您的 Gmail)
-                // 若陣列為空 [] 則不限制，所有人皆可登入
-                const WHITELIST = [
-                    // "kevin@gmail.com", 
-                    // "admin@example.com"
-                ];
-
                 const unsubscribe = window.onAuthStateChanged(window.auth, async (u) => {
                     if (u && !u.isAnonymous) {
-                        // 如果白名單有內容，且使用者不在名單內 -> 登出
-                        if (WHITELIST.length > 0 && !WHITELIST.includes(u.email)) {
-                            alert(`⛔ 存取被拒\n\n帳號 ${u.email} 未在白名單內，將自動登出。`);
-                            await window.signOut(window.auth);
-                            setUser(null);
-                        } else {
-                            setUser(u);
+                        try {
+                            const whitelistRef = window.doc(window.db, 'artifacts', window.firebaseAppId, 'public', 'data', 'system', 'whitelist');
+                            const snap = await window.getDoc(whitelistRef);
+                            
+                            if (snap.exists()) {
+                                const data = snap.data();
+                                // Support both Array (standard) and String (single email) format from DB
+                                const rawList = data.emails;
+                                const list = Array.isArray(rawList) ? rawList : (rawList ? [rawList] : []);
+                                
+                                if (list.length > 0 && !list.includes(u.email)) {
+                                    await window.signOut(window.auth);
+                                    setUser(null);
+                                    setAuthError(`⛔ 帳號 ${u.email} 未在白名單內，存取被拒。`);
+                                    setLoading(false);
+                                    return;
+                                }
+                            }
+                        } catch (err) {
+                            console.error("Whitelist check failed", err);
+                            // Optional: If check fails (e.g. no internet/permission), decide whether to allow or block.
+                            // Currently allowing to proceed if check fails (fail-open) for UX, 
+                            // but real data access is protected by backend Security Rules anyway.
                         }
-                    } else {
-                        setUser(u);
                     }
+                    setUser(u);
                     setLoading(false);
                 });
                 return () => unsubscribe();
@@ -621,7 +560,7 @@
             });
 
             if (loading) return <div className="min-h-screen flex items-center justify-center text-white bg-bgDark">載入中...</div>;
-            if (!user) return <LoginScreen onLogin={()=>window.signInWithPopup(window.auth, new window.GoogleAuthProvider())} onGuest={()=>window.signInAnonymously(window.auth)} />;
+            if (!user) return <LoginScreen onLogin={()=>{ setAuthError(''); window.signInWithPopup(window.auth, new window.GoogleAuthProvider()); }} onGuest={()=>{ setAuthError(''); window.signInAnonymously(window.auth); }} authError={authError} />;
 
             return (
                 <div className="min-h-screen pb-20 relative">
