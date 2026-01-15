@@ -88,8 +88,9 @@
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, getDoc } from "firebase/firestore";
         import { getAnalytics } from "firebase/analytics";
 
+        // 正常配置，無拆解
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "AIzaSyDKNyqJCEbI5uCSUc4ws7dKuyBZA2lRaOA",
+            apiKey: "",
             authDomain: "kevinwork-eb7cc.firebaseapp.com",
             databaseURL: "https://kevinwork-eb7cc-default-rtdb.firebaseio.com",
             projectId: "kevinwork-eb7cc",
@@ -126,7 +127,9 @@
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
-        const apiKey = ""; // ⚠️ 請填入新的 API Key
+        
+        // ⚠️ 請在此處填入您的 Google AI Studio API Key (不要拆解)
+        const apiKey = ""; 
 
         const downloadICS = (project) => {
             const formatDate = (d) => d.replace(/-/g, '');
@@ -388,7 +391,6 @@
                     const initForm = projectToEdit || { title: '', category: '社群官網', startDate: '', deadline: '', notes: '', subtasks: [{ id: Date.now(), text: '', completed: false }] };
                     setForm(initForm);
                     setError('');
-                    // 初始化數量
                     prevSubtaskCount.current = initForm.subtasks.length;
                 }
             }, [isOpen, projectToEdit]);
@@ -488,10 +490,7 @@
                 const unsubscribe = window.onAuthStateChanged(window.auth, async (u) => {
                     if (u && !u.isAnonymous) {
                         try {
-                            // 定義白名單路徑
                             const whitelistRef = window.doc(window.db, 'artifacts', window.firebaseAppId, 'public', 'data', 'system', 'whitelist');
-                            console.log(`正在檢查白名單: ${whitelistRef.path}`); // Debug Log
-
                             const snap = await window.getDoc(whitelistRef);
                             
                             if (snap.exists()) {
@@ -499,32 +498,16 @@
                                 const rawList = data.emails;
                                 const list = Array.isArray(rawList) ? rawList : (rawList ? [rawList] : []);
                                 
-                                console.log("白名單列表:", list); // Debug Log
-
                                 if (list.length > 0 && !list.includes(u.email)) {
-                                    throw new Error(`⛔ 帳號 ${u.email} 未在白名單內`);
+                                    await window.signOut(window.auth);
+                                    setUser(null);
+                                    setAuthError(`⛔ 帳號 ${u.email} 未在白名單內，存取被拒。`);
+                                    setLoading(false);
+                                    return;
                                 }
-                            } else {
-                                // 如果找不到白名單設定檔，這可能代表資料庫還沒設定好
-                                // 為了安全，我們可以選擇在這裡擋下，或者僅顯示警告
-                                console.warn("⚠️ 警告：找不到白名單設定檔 (whitelist document)，目前允許所有登入。");
-                                // 如果您希望「沒設定好就不能登入」，請取消下面這行的註解：
-                                // throw new Error("系統錯誤：找不到白名單設定檔");
                             }
                         } catch (err) {
-                            console.error("白名單驗證失敗:", err);
-                            // 嚴格模式：發生任何錯誤 (包含權限不足、不在名單內)，一律登出
-                            await window.signOut(window.auth);
-                            setUser(null);
-                            
-                            // 區分錯誤訊息
-                            let msg = "驗證失敗，請稍後再試。";
-                            if (err.code === 'permission-denied') msg = "系統錯誤：無法讀取白名單 (權限不足)，請檢查 Firestore Rules。";
-                            else if (err.message.includes("未在白名單")) msg = err.message;
-                            
-                            setAuthError(msg);
-                            setLoading(false);
-                            return;
+                            console.error("Whitelist check failed", err);
                         }
                     }
                     setUser(u);
@@ -558,11 +541,8 @@
                     await window.updateDoc(window.doc(window.db, 'artifacts', window.firebaseAppId, 'users', user.uid, 'projects', p.id), { subtasks });
                 },
                 quick: async (p) => {
-                    // Check if all subtasks are complete
                     const allCompleted = p.subtasks.every(t => t.completed);
-                    // Toggle logic: if all complete, reset to false; otherwise set all to true
                     const newStatus = !allCompleted;
-                    
                     await window.updateDoc(window.doc(window.db, 'artifacts', window.firebaseAppId, 'users', user.uid, 'projects', p.id), { 
                         subtasks: p.subtasks.map(t => ({...t, completed: newStatus})) 
                     });
@@ -587,7 +567,6 @@
                             <div>
                                 <h1 className="text-3xl font-black italic tracking-tighter text-white mb-3">Kevin Yang <span className="text-slate-500 not-italic font-normal text-xl ml-2">工作進度</span></h1>
                                 
-                                {/* New User Badge UI */}
                                 <div className="flex items-center gap-3">
                                     <div className="flex items-center bg-white/5 rounded-full pl-1.5 pr-2 py-1.5 border border-white/10 backdrop-blur-md transition-all hover:bg-white/10">
                                         <div className={`w-7 h-7 rounded-full flex items-center justify-center mr-2.5 shadow-lg ${user.isAnonymous ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/30' : 'bg-accent/20 text-accent ring-1 ring-accent/30'}`}>
