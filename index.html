@@ -127,7 +127,7 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        const downloadICS = (project) => {
+        const downloadICS = async (project) => {
             const formatDate = (d) => d.replace(/-/g, '');
             const getNextDay = (d) => { if(!d) return ''; const date = new Date(d); date.setDate(date.getDate() + 1); return date.toISOString().split('T')[0].replace(/-/g, ''); };
             let desc = `備註: ${project.notes || '無'}\\n\\n子任務:\\n`;
@@ -140,18 +140,31 @@
                 `SUMMARY:[${project.category}] ${project.title}`, `DESCRIPTION:${desc}`, 'END:VEVENT', 'END:VCALENDAR'
             ].join('\r\n');
 
-            // 判斷是否為 iOS 裝置
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-            if (isIOS) {
-                // iOS 專用修復：直接導向 Data URI，強制 Safari 解析為行事曆事件
+            try {
+                // iOS / Modern Android - Use Web Share API for native experience
+                const file = new File([content], `${project.title}.ics`, { type: 'text/calendar' });
+                
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: project.title,
+                        text: '專案行事曆檔案'
+                    });
+                } else {
+                    // Fallback for Desktop
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(new Blob([content], { type: 'text/calendar;charset=utf-8' }));
+                    link.setAttribute('download', `${project.title}.ics`);
+                    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                }
+            } catch (error) {
+                console.error("分享失敗，嘗試備用下載方式", error);
+                // Last resort fallback
                 const uri = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(content);
-                window.location.href = uri;
-            } else {
-                // 電腦/Android 標準下載方式
                 const link = document.createElement('a');
-                link.href = URL.createObjectURL(new Blob([content], { type: 'text/calendar;charset=utf-8' }));
+                link.href = uri;
                 link.setAttribute('download', `${project.title}.ics`);
+                link.target = '_blank';
                 document.body.appendChild(link); link.click(); document.body.removeChild(link);
             }
         };
@@ -203,7 +216,6 @@
             );
         };
 
-        // Settings Modal for API Key
         const SettingsModal = ({ isOpen, onClose }) => {
             if (!isOpen) return null;
             const [key, setKey] = useState(localStorage.getItem('gemini_api_key') || '');
@@ -426,7 +438,6 @@
             const [loading, setLoading] = useState(false);
             const [error, setError] = useState('');
             const subtaskRef = useRef([]);
-            // 新增：用來記錄上一次子任務數量的 ref
             const prevSubtaskCount = useRef(0);
 
             useEffect(() => {
@@ -438,7 +449,6 @@
                 }
             }, [isOpen, projectToEdit]);
 
-            // 新增：監聽子任務數量變化，若增加則聚焦最後一個輸入框
             useEffect(() => {
                 if (form.subtasks.length > prevSubtaskCount.current) {
                     const lastIndex = form.subtasks.length - 1;
@@ -457,15 +467,20 @@
             const addSubtaskRow = () => setForm({...form, subtasks: [...form.subtasks, { id: Date.now() + Math.random(), text: '', completed: false }]});
             const removeSubtaskRow = (idx) => setForm({...form, subtasks: form.subtasks.filter((_, i) => i !== idx)});
 
+            // Added handler for start date change
+            const handleStartDateChange = (e) => {
+                const val = e.target.value;
+                // If it's a new project (no end date yet) or user wants quick select, set both.
+                // Here we set both to the same date if the deadline is empty OR just for convenience as requested.
+                // The prompt says "fill start date, end date will automatically select the same day".
+                // I will implement it such that changing start date updates end date to match it.
+                setForm(prev => ({ ...prev, startDate: val, deadline: val }));
+            };
+
             const handleAI = async () => {
-                // Get Key from LocalStorage
                 const savedKey = localStorage.getItem('gemini_api_key');
-                if (!savedKey) { 
-                    setError('請點擊右上角 ⚙️ 設定您的 Gemini API Key'); 
-                    return; 
-                }
+                if (!savedKey) { setError('請點擊右上角 ⚙️ 設定您的 Gemini API Key'); return; }
                 if (!form.title) { setError('請輸入名稱'); return; }
-                
                 setLoading(true); setError('');
                 try {
                     const isLocal = window.location.hostname === 'localhost' || window.location.protocol === 'file:';
@@ -481,6 +496,7 @@
                 } catch (e) { setError('生成失敗: ' + e.message); } finally { setLoading(false); }
             };
 
+            // Wrapped content in a form element to handle required validation properly
             return (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose}></div>
@@ -489,40 +505,46 @@
                             <h2 className="text-lg font-bold text-white tracking-wide">{projectToEdit ? '編輯專案' : '新專案'}</h2>
                             <button onClick={onClose}><i className="fa-solid fa-times text-slate-400 hover:text-white"></i></button>
                         </div>
-                        <div className="overflow-y-auto p-4 sm:p-6 custom-scrollbar flex-1 space-y-5">
-                            {error && <div className="text-red-400 text-sm bg-red-500/10 p-3 rounded border border-red-500/20">{error}</div>}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div className="md:col-span-2">
-                                    <div className="flex justify-between mb-1"><label className="text-xs font-bold text-slate-400 uppercase">名稱</label><button onClick={handleAI} disabled={loading} className="text-xs text-accent"><i className={`fa-solid ${loading?'fa-spinner fa-spin':'fa-wand-magic-sparkles'}`}></i> AI 填寫</button></div>
-                                    <input className="glass-input w-full px-4 py-2.5 rounded-lg" value={form.title} onChange={e=>setForm({...form, title:e.target.value})} placeholder="例如: 尾牙活動" />
-                                </div>
-                                <div><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">類別</label><select className="glass-input w-full px-4 py-2.5 rounded-lg" value={form.category} onChange={e=>setForm({...form, category:e.target.value})}>{['社群官網','設計','數位廣告','展覽','影片'].map(c=><option key={c} value={c} className="bg-slate-900">{c}</option>)}</select></div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    <div><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">開始</label><input type="date" className="glass-input w-full px-2 py-2.5 rounded-lg text-sm" value={form.startDate} onChange={e=>setForm({...form, startDate:e.target.value})} /></div>
-                                    <div><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">結束</label><input type="date" className="glass-input w-full px-2 py-2.5 rounded-lg text-sm" value={form.deadline} onChange={e=>setForm({...form, deadline:e.target.value})} /></div>
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">子任務</label>
-                                    <div className="space-y-2 mb-2">
-                                        {form.subtasks.map((t, i) => (
-                                            <div key={t.id} className="flex gap-2">
-                                                <input ref={el=>subtaskRef.current[i]=el} className="glass-input flex-grow px-3 py-2 rounded text-sm" value={t.text} onChange={e=>{const n=[...form.subtasks];n[i].text=e.target.value;setForm({...form,subtasks:n})}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addSubtaskRow();}}} placeholder="任務..." />
-                                                <button onClick={()=>setForm({...form,subtasks:form.subtasks.filter((_,idx)=>idx!==i)})} className="text-slate-500 hover:text-red-400 px-2"><i className="fa-solid fa-trash-can"></i></button>
-                                            </div>
-                                        ))}
+                        <form id="projectForm" onSubmit={(e) => {
+                            e.preventDefault();
+                            onSave({ ...form, subtasks: form.subtasks.filter(t => t.text.trim() !== '') });
+                            onClose();
+                        }} className="flex flex-col flex-1 overflow-hidden">
+                            <div className="overflow-y-auto p-4 sm:p-6 custom-scrollbar flex-1 space-y-5">
+                                {error && <div className="text-red-400 text-sm bg-red-500/10 p-3 rounded border border-red-500/20">{error}</div>}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    <div className="md:col-span-2">
+                                        <div className="flex justify-between mb-1"><label className="text-xs font-bold text-slate-400 uppercase">名稱</label><button type="button" onClick={handleAI} disabled={loading} className="text-xs text-accent"><i className={`fa-solid ${loading?'fa-spinner fa-spin':'fa-wand-magic-sparkles'}`}></i> AI 填寫</button></div>
+                                        <input required className="glass-input w-full px-4 py-2.5 rounded-lg" value={form.title} onChange={e=>setForm({...form, title:e.target.value})} placeholder="例如: 尾牙活動" />
                                     </div>
-                                    <button onClick={addSubtaskRow} className="text-xs text-accent font-medium flex items-center gap-1"><i className="fa-solid fa-plus"></i> 新增任務</button>
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">備註</label>
-                                    <textarea className="glass-input w-full px-4 py-2.5 rounded-lg h-24 resize-none" value={form.notes} onChange={e=>setForm({...form, notes:e.target.value})}></textarea>
+                                    <div><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">類別</label><select className="glass-input w-full px-4 py-2.5 rounded-lg" value={form.category} onChange={e=>setForm({...form, category:e.target.value})}>{['社群官網','設計','數位廣告','展覽','影片'].map(c=><option key={c} value={c} className="bg-slate-900">{c}</option>)}</select></div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <div><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">開始</label><input required type="date" className="glass-input w-full px-2 py-2.5 rounded-lg text-sm" value={form.startDate} onChange={handleStartDateChange} /></div>
+                                        <div><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">結束</label><input required type="date" className="glass-input w-full px-2 py-2.5 rounded-lg text-sm" value={form.deadline} onChange={e=>setForm({...form, deadline:e.target.value})} /></div>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">子任務</label>
+                                        <div className="space-y-2 mb-2">
+                                            {form.subtasks.map((t, i) => (
+                                                <div key={t.id} className="flex gap-2">
+                                                    <input ref={el=>subtaskRef.current[i]=el} className="glass-input flex-grow px-3 py-2 rounded text-sm" value={t.text} onChange={e=>{const n=[...form.subtasks];n[i].text=e.target.value;setForm({...form,subtasks:n})}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addSubtaskRow();}}} placeholder="任務..." />
+                                                    <button type="button" onClick={()=>setForm({...form,subtasks:form.subtasks.filter((_,idx)=>idx!==i)})} className="text-slate-500 hover:text-red-400 px-2"><i className="fa-solid fa-trash-can"></i></button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <button type="button" onClick={addSubtaskRow} className="text-xs text-accent font-medium flex items-center gap-1"><i className="fa-solid fa-plus"></i> 新增任務</button>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">備註</label>
+                                        <textarea className="glass-input w-full px-4 py-2.5 rounded-lg h-24 resize-none" value={form.notes} onChange={e=>setForm({...form, notes:e.target.value})}></textarea>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div className="p-4 border-t border-white/10 bg-slate-800/50 flex justify-end gap-3 shrink-0">
-                            <button onClick={onClose} className="px-5 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-white bg-white/5">取消</button>
-                            <button onClick={()=>{onSave({...form, subtasks:form.subtasks.filter(t=>t.text)});onClose()}} className="px-6 py-2 rounded-lg text-sm font-bold text-white bg-accent shadow-glow hover:bg-blue-600 active:scale-95 transition-all">儲存</button>
-                        </div>
+                            <div className="p-4 border-t border-white/10 bg-slate-800/50 flex justify-end gap-3 shrink-0">
+                                <button type="button" onClick={onClose} className="px-5 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-white bg-white/5">取消</button>
+                                <button type="submit" className="px-6 py-2 rounded-lg text-sm font-bold text-white bg-accent shadow-glow hover:bg-blue-600 active:scale-95 transition-all">儲存</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             );
@@ -535,7 +557,6 @@
             const [loading, setLoading] = useState(true);
 
             useEffect(() => {
-                // No whitelist check, just basic auth state listener
                 const unsubscribe = window.onAuthStateChanged(window.auth, (u) => {
                     setUser(u);
                     setLoading(false);
