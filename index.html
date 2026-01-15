@@ -88,6 +88,7 @@
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, getDoc } from "firebase/firestore";
         import { getAnalytics } from "firebase/analytics";
 
+        // 已還原為您原始提供的 Firebase 設定
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyDKNyqJCEbI5uCSUc4ws7dKuyBZA2lRaOA",
             authDomain: "kevinwork-eb7cc.firebaseapp.com",
@@ -126,9 +127,6 @@
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
-        
-        // ⚠️ 請填入您的 API Key (不要拆解)
-        const apiKey = ""; 
 
         const downloadICS = (project) => {
             const formatDate = (d) => d.replace(/-/g, '');
@@ -159,14 +157,12 @@
                         <h1 className="text-3xl font-black italic tracking-tighter text-white mb-2">Kevin Yang</h1>
                         <p className="text-slate-400 text-sm">專案進度管理儀表板</p>
                     </div>
-
                     {authError && (
                         <div className="bg-red-500/20 border border-red-500/50 text-red-200 px-4 py-3 rounded-lg text-sm mb-6 flex items-start gap-3 text-left animate-pulse">
                             <i className="fa-solid fa-circle-exclamation mt-0.5 shrink-0"></i>
                             <span>{authError}</span>
                         </div>
                     )}
-
                     <div className="space-y-4">
                         <button onClick={onLogin} className="w-full bg-white text-slate-900 font-bold py-3 px-4 rounded-xl hover:bg-slate-100 flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg">
                             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="G" /> 使用 Google 帳號登入
@@ -190,6 +186,43 @@
                         <div className="flex justify-center gap-3">
                             <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-slate-300 bg-slate-700/50 hover:bg-slate-700 transition-all">取消</button>
                             <button onClick={onConfirm} className="px-5 py-2 rounded-lg text-sm font-bold text-white bg-red-500 hover:bg-red-600 shadow-lg transition-all">確定刪除</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Settings Modal for API Key
+        const SettingsModal = ({ isOpen, onClose }) => {
+            if (!isOpen) return null;
+            const [key, setKey] = useState(localStorage.getItem('gemini_api_key') || '');
+            
+            const handleSave = () => {
+                localStorage.setItem('gemini_api_key', key);
+                onClose();
+                alert("API Key 已儲存！");
+            };
+
+            return (
+                <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose}></div>
+                    <div className="relative w-full max-w-md glass-panel rounded-2xl p-6 animate-fade-in border border-white/10">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2"><i className="fa-solid fa-gear text-slate-400"></i> 設定</h3>
+                            <button onClick={onClose}><i className="fa-solid fa-times text-slate-400 hover:text-white"></i></button>
+                        </div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Gemini API Key</label>
+                                <input type="password" className="glass-input w-full p-3 rounded-lg text-sm" value={key} onChange={e=>setKey(e.target.value)} placeholder="AIzaSy..." />
+                                <p className="text-[10px] text-slate-500 mt-2">
+                                    請前往 <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-accent underline">Google AI Studio</a> 申請免費金鑰。
+                                    <br/>金鑰僅儲存於您的瀏覽器中，不會上傳。
+                                </p>
+                            </div>
+                        </div>
+                        <div className="mt-6 flex justify-end">
+                            <button onClick={handleSave} className="px-6 py-2 rounded-lg text-sm font-bold text-white bg-accent shadow-glow hover:bg-blue-600 transition-all">儲存設定</button>
                         </div>
                     </div>
                 </div>
@@ -390,7 +423,6 @@
                     const initForm = projectToEdit || { title: '', category: '社群官網', startDate: '', deadline: '', notes: '', subtasks: [{ id: Date.now(), text: '', completed: false }] };
                     setForm(initForm);
                     setError('');
-                    // 初始化數量
                     prevSubtaskCount.current = initForm.subtasks.length;
                 }
             }, [isOpen, projectToEdit]);
@@ -415,13 +447,19 @@
             const removeSubtaskRow = (idx) => setForm({...form, subtasks: form.subtasks.filter((_, i) => i !== idx)});
 
             const handleAI = async () => {
-                if (!apiKey) { setError('請先在程式碼中設定 API Key'); return; }
+                // Get Key from LocalStorage
+                const savedKey = localStorage.getItem('gemini_api_key');
+                if (!savedKey) { 
+                    setError('請點擊右上角 ⚙️ 設定您的 Gemini API Key'); 
+                    return; 
+                }
                 if (!form.title) { setError('請輸入名稱'); return; }
+                
                 setLoading(true); setError('');
                 try {
                     const isLocal = window.location.hostname === 'localhost' || window.location.protocol === 'file:';
                     const model = isLocal ? 'gemini-1.5-flash' : 'gemini-2.5-flash-preview-09-2025';
-                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${savedKey}`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ contents: [{ parts: [{ text: `Generate JSON for project '${form.title}': {"category": "One of ['社群官網', '設計', '數位廣告', '展覽', '影片']", "description": "Trad. Chinese summary", "subtasks": [{"text": "Task1", "completed": false}], "notes": "Trad. Chinese notes"}. Clean JSON only.` }] }] })
                     });
@@ -482,52 +520,13 @@
         const App = () => {
             const [user, setUser] = useState(null);
             const [projects, setProjects] = useState([]);
-            const [ui, setUi] = useState({ modal:false, report:false, delete:false, editId:null, delId:null, filter:'all' });
+            const [ui, setUi] = useState({ modal:false, report:false, delete:false, settings:false, editId:null, delId:null, filter:'all' });
             const [loading, setLoading] = useState(true);
-            const [authError, setAuthError] = useState('');
 
             useEffect(() => {
-                const unsubscribe = window.onAuthStateChanged(window.auth, async (u) => {
-                    if (u && !u.isAnonymous) {
-                        try {
-                            const whitelistRef = window.doc(window.db, 'artifacts', window.firebaseAppId, 'public', 'data', 'system', 'whitelist');
-                            console.log(`[Security] 正在檢查白名單設定: ${whitelistRef.path}`); // 方便除錯
-
-                            const snap = await window.getDoc(whitelistRef);
-                            
-                            if (snap.exists()) {
-                                const data = snap.data();
-                                const rawList = data.emails;
-                                const list = Array.isArray(rawList) ? rawList : (rawList ? [rawList] : []);
-                                
-                                console.log(`[Security] 白名單列表:`, list);
-
-                                if (!list.includes(u.email)) {
-                                    throw new Error(`⛔ 抱歉，帳號 ${u.email} 未在授權名單內。`);
-                                }
-                            } else {
-                                console.warn(`[Security] 找不到白名單文件。路徑: ${whitelistRef.path}`);
-                                throw new Error("系統錯誤：找不到白名單設定檔 (請檢查 Firebase 資料庫路徑)");
-                            }
-
-                            setUser(u);
-                            setAuthError('');
-
-                        } catch (err) {
-                            console.error("[Security] 驗證失敗:", err);
-                            await window.signOut(window.auth);
-                            setUser(null);
-                            
-                            let msg = err.message;
-                            if (err.code === 'permission-denied') {
-                                msg = "系統錯誤：讀取權限不足 (請檢查 Firestore Rules)";
-                            }
-                            setAuthError(msg);
-                        }
-                    } else {
-                        setUser(u);
-                        setAuthError('');
-                    }
+                // No whitelist check, just basic auth state listener
+                const unsubscribe = window.onAuthStateChanged(window.auth, (u) => {
+                    setUser(u);
                     setLoading(false);
                 });
                 return () => unsubscribe();
@@ -537,7 +536,7 @@
                 if (!user) { setProjects([]); return; }
                 const q = window.query(window.collection(window.db, 'artifacts', window.firebaseAppId, 'users', user.uid, 'projects'));
                 return window.onSnapshot(q, s => setProjects(s.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>b.createdAt-a.createdAt)), e => {
-                    if (e.code === 'permission-denied') alert('⚠️ 請先設定 Firestore 安全規則！\n\n前往 Firebase Console -> Build -> Firestore -> Rules\n貼上規則: allow read, write: if request.auth != null;');
+                    if (e.code === 'permission-denied') alert('⚠️ 請先設定 Firestore 安全規則！');
                 });
             }, [user]);
 
@@ -572,7 +571,7 @@
             });
 
             if (loading) return <div className="min-h-screen flex items-center justify-center text-white bg-bgDark">載入中...</div>;
-            if (!user) return <LoginScreen onLogin={()=>{ setAuthError(''); window.signInWithPopup(window.auth, new window.GoogleAuthProvider()); }} onGuest={()=>{ setAuthError(''); window.signInAnonymously(window.auth); }} authError={authError} />;
+            if (!user) return <LoginScreen onLogin={()=>{ window.signInWithPopup(window.auth, new window.GoogleAuthProvider()); }} onGuest={()=>{ window.signInAnonymously(window.auth); }} />;
 
             return (
                 <div className="min-h-screen pb-20 relative">
@@ -584,6 +583,7 @@
                             <div>
                                 <h1 className="text-3xl font-black italic tracking-tighter text-white mb-3">Kevin Yang <span className="text-slate-500 not-italic font-normal text-xl ml-2">工作進度</span></h1>
                                 
+                                {/* New User Badge UI */}
                                 <div className="flex items-center gap-3">
                                     <div className="flex items-center bg-white/5 rounded-full pl-1.5 pr-2 py-1.5 border border-white/10 backdrop-blur-md transition-all hover:bg-white/10">
                                         <div className={`w-7 h-7 rounded-full flex items-center justify-center mr-2.5 shadow-lg ${user.isAnonymous ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/30' : 'bg-accent/20 text-accent ring-1 ring-accent/30'}`}>
@@ -605,6 +605,7 @@
                             </div>
 
                             <div className="flex gap-3">
+                                <button onClick={()=>setUi({...ui, settings:true})} className="group flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 w-10 h-10 rounded-lg transition-all shadow-lg active:scale-95"><i className="fa-solid fa-gear"></i></button>
                                 <button onClick={()=>setUi({...ui, report:true})} className="group flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 px-5 py-3 rounded-lg transition-all shadow-lg active:scale-95"><i className="fa-solid fa-chart-line text-sm text-accent"></i> <span className="font-bold text-sm">報表與匯出</span></button>
                                 <button onClick={()=>setUi({...ui, modal:true, editId:null})} className="group flex items-center gap-2 bg-accent/90 hover:bg-blue-500 text-white px-6 py-3 rounded-lg shadow-glow transition-all active:scale-95"><i className="fa-solid fa-plus text-sm group-hover:rotate-180 transition-transform"></i> <span className="font-bold text-sm">NEW PROJECT</span></button>
                             </div>
@@ -621,6 +622,7 @@
                     </div>
                     <AddProjectModal isOpen={ui.modal} onClose={()=>setUi({...ui, modal:false})} onSave={actions.save} projectToEdit={projects.find(p=>p.id===ui.editId)} />
                     <ReportModal isOpen={ui.report} onClose={()=>setUi({...ui, report:false})} projects={projects} />
+                    <SettingsModal isOpen={ui.settings} onClose={()=>setUi({...ui, settings:false})} />
                     <ConfirmModal isOpen={ui.delete} onClose={()=>setUi({...ui, delete:false})} onConfirm={actions.del} message="確定要刪除此專案嗎？此動作無法復原。" />
                 </div>
             );
