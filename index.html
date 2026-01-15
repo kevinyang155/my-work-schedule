@@ -127,7 +127,7 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        const downloadICS = async (project) => {
+        const downloadICS = (project) => {
             const formatDate = (d) => d.replace(/-/g, '');
             const getNextDay = (d) => { if(!d) return ''; const date = new Date(d); date.setDate(date.getDate() + 1); return date.toISOString().split('T')[0].replace(/-/g, ''); };
             let desc = `備註: ${project.notes || '無'}\\n\\n子任務:\\n`;
@@ -140,31 +140,19 @@
                 `SUMMARY:[${project.category}] ${project.title}`, `DESCRIPTION:${desc}`, 'END:VEVENT', 'END:VCALENDAR'
             ].join('\r\n');
 
-            try {
-                // iOS / Modern Android - Use Web Share API for native experience
-                const file = new File([content], `${project.title}.ics`, { type: 'text/calendar' });
-                
-                if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    await navigator.share({
-                        files: [file],
-                        title: project.title,
-                        text: '專案行事曆檔案'
-                    });
-                } else {
-                    // Fallback for Desktop
-                    const link = document.createElement('a');
-                    link.href = URL.createObjectURL(new Blob([content], { type: 'text/calendar;charset=utf-8' }));
-                    link.setAttribute('download', `${project.title}.ics`);
-                    document.body.appendChild(link); link.click(); document.body.removeChild(link);
-                }
-            } catch (error) {
-                console.error("分享失敗，嘗試備用下載方式", error);
-                // Last resort fallback
+            // 判斷是否為 iOS 裝置
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+            if (isIOS) {
+                // iOS 修復：直接使用 window.location.href 導向 Data URI
+                // 這會強制 Safari 嘗試解析檔案內容，通常會跳出「加入行事曆」的選項
                 const uri = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(content);
+                window.location.href = uri;
+            } else {
+                // 電腦/Android：使用標準下載連結
                 const link = document.createElement('a');
-                link.href = uri;
+                link.href = URL.createObjectURL(new Blob([content], { type: 'text/calendar;charset=utf-8' }));
                 link.setAttribute('download', `${project.title}.ics`);
-                link.target = '_blank';
                 document.body.appendChild(link); link.click(); document.body.removeChild(link);
             }
         };
@@ -385,7 +373,7 @@
                         </div>
                         <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto pt-3 sm:pt-0 border-t border-white/5 sm:border-0">
                             <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-300 sm:transform sm:translate-x-2 sm:group-hover:translate-x-0">
-                                <button onClick={(e) => { e.stopPropagation(); onQuickComplete(project); }} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all shadow-lg active:scale-95 ${isAllCompleted ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500 hover:text-white border border-yellow-500/30' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 hover:shadow-emerald-500/30'}`} title={isAllCompleted ? "取消完成" : "全部完成"}><i className={`fa-solid ${isAllCompleted ? 'fa-rotate-left' : 'fa-check'}`}></i></button>
+                                <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); onQuickComplete(project); }} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all shadow-lg active:scale-95 ${isAllCompleted ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500 hover:text-white border border-yellow-500/30' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 hover:shadow-emerald-500/30'}`} title={isAllCompleted ? "取消完成" : "全部完成"}><i className={`fa-solid ${isAllCompleted ? 'fa-rotate-left' : 'fa-check'}`}></i></button>
                                 <button onClick={(e) => { e.stopPropagation(); onDelete(project.id); }} className="w-9 h-9 rounded-full bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/20 flex items-center justify-center transition-all shadow-lg hover:shadow-red-500/30" title="快速刪除"><i className="fa-solid fa-trash"></i></button>
                             </div>
                             <div className="flex items-center gap-4">
@@ -438,6 +426,7 @@
             const [loading, setLoading] = useState(false);
             const [error, setError] = useState('');
             const subtaskRef = useRef([]);
+            // 新增：用來記錄上一次子任務數量的 ref
             const prevSubtaskCount = useRef(0);
 
             useEffect(() => {
@@ -449,6 +438,7 @@
                 }
             }, [isOpen, projectToEdit]);
 
+            // 新增：監聽子任務數量變化，若增加則聚焦最後一個輸入框
             useEffect(() => {
                 if (form.subtasks.length > prevSubtaskCount.current) {
                     const lastIndex = form.subtasks.length - 1;
@@ -470,17 +460,18 @@
             // Added handler for start date change
             const handleStartDateChange = (e) => {
                 const val = e.target.value;
-                // If it's a new project (no end date yet) or user wants quick select, set both.
-                // Here we set both to the same date if the deadline is empty OR just for convenience as requested.
-                // The prompt says "fill start date, end date will automatically select the same day".
-                // I will implement it such that changing start date updates end date to match it.
                 setForm(prev => ({ ...prev, startDate: val, deadline: val }));
             };
 
             const handleAI = async () => {
+                // Get Key from LocalStorage
                 const savedKey = localStorage.getItem('gemini_api_key');
-                if (!savedKey) { setError('請點擊右上角 ⚙️ 設定您的 Gemini API Key'); return; }
+                if (!savedKey) { 
+                    setError('請點擊右上角 ⚙️ 設定您的 Gemini API Key'); 
+                    return; 
+                }
                 if (!form.title) { setError('請輸入名稱'); return; }
+                
                 setLoading(true); setError('');
                 try {
                     const isLocal = window.location.hostname === 'localhost' || window.location.protocol === 'file:';
@@ -496,7 +487,6 @@
                 } catch (e) { setError('生成失敗: ' + e.message); } finally { setLoading(false); }
             };
 
-            // Wrapped content in a form element to handle required validation properly
             return (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose}></div>
@@ -589,16 +579,25 @@
                     await window.updateDoc(window.doc(window.db, 'artifacts', window.firebaseAppId, 'users', user.uid, 'projects', p.id), { subtasks });
                 },
                 quick: async (p) => {
-                    // Safe check for subtasks
-                    const subtasks = p.subtasks || [];
-                    if (subtasks.length === 0) return;
+                    try {
+                        let subtasks = p.subtasks || [];
+                        
+                        // Fix: If no subtasks, treat as a single "Project Completion" task
+                        if (subtasks.length === 0) {
+                            subtasks = [{ id: Date.now(), text: '專案完成', completed: true }];
+                        } else {
+                            // Toggle existing tasks
+                            const allCompleted = subtasks.every(t => t.completed);
+                            const newStatus = !allCompleted;
+                            subtasks = subtasks.map(t => ({...t, completed: newStatus}));
+                        }
 
-                    const allCompleted = subtasks.every(t => t.completed);
-                    const newStatus = !allCompleted;
-                    
-                    await window.updateDoc(window.doc(window.db, 'artifacts', window.firebaseAppId, 'users', user.uid, 'projects', p.id), { 
-                        subtasks: subtasks.map(t => ({...t, completed: newStatus})) 
-                    });
+                        const docRef = window.doc(window.db, 'artifacts', window.firebaseAppId, 'users', user.uid, 'projects', p.id);
+                        await window.updateDoc(docRef, { subtasks });
+                    } catch (error) {
+                        console.error("Quick complete error:", error);
+                        alert("操作失敗，請稍後再試");
+                    }
                 }
             };
 
