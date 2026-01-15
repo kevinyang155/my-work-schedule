@@ -88,7 +88,6 @@
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, getDoc } from "firebase/firestore";
         import { getAnalytics } from "firebase/analytics";
 
-        // 已還原為您原始提供的 Firebase 設定
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyDKNyqJCEbI5uCSUc4ws7dKuyBZA2lRaOA",
             authDomain: "kevinwork-eb7cc.firebaseapp.com",
@@ -133,16 +132,28 @@
             const getNextDay = (d) => { if(!d) return ''; const date = new Date(d); date.setDate(date.getDate() + 1); return date.toISOString().split('T')[0].replace(/-/g, ''); };
             let desc = `備註: ${project.notes || '無'}\\n\\n子任務:\\n`;
             (project.subtasks || []).forEach(t => desc += `${t.completed ? '[v]' : '[ ]'} ${t.text}\\n`);
+            
             const content = [
                 'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Kevin Dashboard//ZH', 'BEGIN:VEVENT',
                 `UID:${project.id}-${Date.now()}`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
                 `DTSTART;VALUE=DATE:${formatDate(project.startDate)}`, `DTEND;VALUE=DATE:${getNextDay(project.deadline)}`,
                 `SUMMARY:[${project.category}] ${project.title}`, `DESCRIPTION:${desc}`, 'END:VEVENT', 'END:VCALENDAR'
             ].join('\r\n');
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(new Blob([content], { type: 'text/calendar;charset=utf-8' }));
-            link.setAttribute('download', `${project.title}.ics`);
-            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+
+            // 判斷是否為 iOS 裝置
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+            if (isIOS) {
+                // iOS 專用修復：直接導向 Data URI，強制 Safari 解析為行事曆事件
+                const uri = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(content);
+                window.location.href = uri;
+            } else {
+                // 電腦/Android 標準下載方式
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(new Blob([content], { type: 'text/calendar;charset=utf-8' }));
+                link.setAttribute('download', `${project.title}.ics`);
+                document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            }
         };
 
         const LoginScreen = ({ onLogin, onGuest, authError }) => (
@@ -557,10 +568,15 @@
                     await window.updateDoc(window.doc(window.db, 'artifacts', window.firebaseAppId, 'users', user.uid, 'projects', p.id), { subtasks });
                 },
                 quick: async (p) => {
-                    const allCompleted = p.subtasks.every(t => t.completed);
+                    // Safe check for subtasks
+                    const subtasks = p.subtasks || [];
+                    if (subtasks.length === 0) return;
+
+                    const allCompleted = subtasks.every(t => t.completed);
                     const newStatus = !allCompleted;
+                    
                     await window.updateDoc(window.doc(window.db, 'artifacts', window.firebaseAppId, 'users', user.uid, 'projects', p.id), { 
-                        subtasks: p.subtasks.map(t => ({...t, completed: newStatus})) 
+                        subtasks: subtasks.map(t => ({...t, completed: newStatus})) 
                     });
                 }
             };
