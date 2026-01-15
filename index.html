@@ -488,28 +488,43 @@
                 const unsubscribe = window.onAuthStateChanged(window.auth, async (u) => {
                     if (u && !u.isAnonymous) {
                         try {
+                            // 定義白名單路徑
                             const whitelistRef = window.doc(window.db, 'artifacts', window.firebaseAppId, 'public', 'data', 'system', 'whitelist');
+                            console.log(`正在檢查白名單: ${whitelistRef.path}`); // Debug Log
+
                             const snap = await window.getDoc(whitelistRef);
                             
                             if (snap.exists()) {
                                 const data = snap.data();
-                                // Support both Array (standard) and String (single email) format from DB
                                 const rawList = data.emails;
                                 const list = Array.isArray(rawList) ? rawList : (rawList ? [rawList] : []);
                                 
+                                console.log("白名單列表:", list); // Debug Log
+
                                 if (list.length > 0 && !list.includes(u.email)) {
-                                    await window.signOut(window.auth);
-                                    setUser(null);
-                                    setAuthError(`⛔ 帳號 ${u.email} 未在白名單內，存取被拒。`);
-                                    setLoading(false);
-                                    return;
+                                    throw new Error(`⛔ 帳號 ${u.email} 未在白名單內`);
                                 }
+                            } else {
+                                // 如果找不到白名單設定檔，這可能代表資料庫還沒設定好
+                                // 為了安全，我們可以選擇在這裡擋下，或者僅顯示警告
+                                console.warn("⚠️ 警告：找不到白名單設定檔 (whitelist document)，目前允許所有登入。");
+                                // 如果您希望「沒設定好就不能登入」，請取消下面這行的註解：
+                                // throw new Error("系統錯誤：找不到白名單設定檔");
                             }
                         } catch (err) {
-                            console.error("Whitelist check failed", err);
-                            // Optional: If check fails (e.g. no internet/permission), decide whether to allow or block.
-                            // Currently allowing to proceed if check fails (fail-open) for UX, 
-                            // but real data access is protected by backend Security Rules anyway.
+                            console.error("白名單驗證失敗:", err);
+                            // 嚴格模式：發生任何錯誤 (包含權限不足、不在名單內)，一律登出
+                            await window.signOut(window.auth);
+                            setUser(null);
+                            
+                            // 區分錯誤訊息
+                            let msg = "驗證失敗，請稍後再試。";
+                            if (err.code === 'permission-denied') msg = "系統錯誤：無法讀取白名單 (權限不足)，請檢查 Firestore Rules。";
+                            else if (err.message.includes("未在白名單")) msg = err.message;
+                            
+                            setAuthError(msg);
+                            setLoading(false);
+                            return;
                         }
                     }
                     setUser(u);
